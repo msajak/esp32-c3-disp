@@ -35,7 +35,7 @@
 //  void rect(int8_t x, int8_t y, uint8_t w, int8_t h, bool on=true) -> draws a filled rectangle. if on=false, erases it...
 //  uint8_t text(char const *s, int8_t x, int8_t y, uint8_t eraseLastCol= 1, int8_t nb=127) // display in 8*6 pixel font. if eraseLastCol=0 then the last character only displays 5 columns
 //  uint8_t text2(char const *s, int8_t x, int8_t y, uint8_t eraseLastCol= 1, int8_t nb=127)  // display in 16*10 pixel font. if eraseLastCol=0 then the last character only displays 10 columns
-//  void blit(uint8_t const *b, uint8_t x, uint8_t y) -> b points to a struct which has wifth, height and then a pixel map of what to display...
+//  void blit(uint8_t const *b, uint8_t x, uint8_t y) -> b points to a struct which has width, height and then a pixel map of what to display...
 
 // pint 0-4 free to use (can be analog)
 // static const int8_t LCDSDA    = 5;  // Data
@@ -66,14 +66,14 @@ public:
         ESP_ERROR_CHECK(i2c_param_config(I2C_PORT, &conf));
         ESP_ERROR_CHECK(i2c_driver_install(I2C_PORT, I2C_MODE_MASTER, 0, 0, 0));
 
-        static uint8_t const initSeq[]= // 1 byte length of data, followed by data to be sent???
+        constexpr uint8_t const initSeq[]= // 1 byte length of data, followed by data to be sent???
         { 2, 0x00, 0xAE,
           3, 0x00, 0xD5, 0x80,
-          3, 0x00, 0xA8, 0x3F,
+          3, 0x00, 0xA8, 0x27,
           3, 0x00, 0xD3, 0x00,
           2, 0x00, 0x40,
           3, 0x00, 0x8D, 0x14,
-          3, 0x00, 0x20, 0x00,
+          3, 0x00, 0x20, 0x02,
           2, 0x00, 0xA1,
           2, 0x00, 0xC8,
           3, 0x00, 0xDA, 0x12,
@@ -83,16 +83,16 @@ public:
           2, 0x00, 0x2E,
           2, 0x00, 0xA4,
           2, 0x00, 0xA6,
-          2, 0x00, 0x7f-11, // 0x40+12, // first line is 12! Command is 0x40 but shifted by -12 so 7f-11... Read the doc... and guess!
+          2, 0x00, 0x40, // start line 0 (matches MUX=40, offset=0 config)
           2, 0x00, 0xAF, // screen on
           0};
         uint8_t const *t= initSeq;
         while (*t!=0) { int l= *t++; send(t, l); t+= l; } // send initialisation sequence...
     }
 
-    void disp() // send the whole screen to the driver and wait until sent to continue...
-    {
-        uint8_t c[4]= { 0x00, 0x11, 0x0e, 0xB0}; // start writing at column 30. row 0 (but we have a WH scroll of 12)
+    void disp()  {
+        // send the whole screen to the driver
+        uint8_t c[4]= { 0x00, 0x11, 0x0c, 0xB0}; // start writing at column 28, row 0
         for (int i=0; i<5; i++)
         {
           c[3]= 0xB0+i; send(c, 4);
@@ -101,21 +101,37 @@ public:
     }
     void screenOn() { static uint8_t const cmd[2]= { 0, 0xAF }; send(cmd, 2); }
     void screenOff() { static uint8_t const cmd[2]= { 0, 0xAE }; send(cmd, 2); }
+
     // Framebuffer manipulations
     // The organization in the framebuffer is non-trivial and non-intuitive it's by set of 8 rows, but with 1 byte = 1 colum of 8 pixels...
     // Note that none of these function do any cliping!
-    bool pixel(int8_t x, int8_t y) { return (fb[x+(y>>3)*ColumnsPlus1] & (1<<(y&7)))!=0; }
-    void pixon(int8_t x, int8_t y) { fb[x+(y>>3)*ColumnsPlus1]|= 1<<(y&7); }
-    void pixoff(int8_t x, int8_t y) { fb[x+(y>>3)*ColumnsPlus1]&= ~(1<<(y&7)); }
+    bool pixel(int8_t x, int8_t y) {
+        return (fb[x+(y>>3)*ColumnsPlus1] & (1<<(y&7)))!=0;
+    }
+
+    void pixon(int8_t x, int8_t y) {
+        fb[x+(y>>3)*ColumnsPlus1]|= 1<<(y&7);
+    }
+
+    void pixoff(int8_t x, int8_t y) {
+        fb[x+(y>>3)*ColumnsPlus1]&= ~(1<<(y&7));
+    }
+
     void hline(int8_t x, uint8_t w, int8_t y, bool on=true) // Horizontal line
     {
         uint8_t m= 1<<(y&7);
         uint8_t *d= fb+x+(y>>3)*ColumnsPlus1;
         if (on) while (w!=0) { w--; *d++|= m; } else { m= ~m; while (w!=0) { w--; *d++&=m; }  }
     }
-    void rect(int8_t x, int8_t y, uint8_t w, int8_t h, bool on=true) { while (--h>=0) hline(x, w, y++, on); }
-    void vline(int8_t x, int8_t y, int8_t h, bool on=true) // Vertical lune // could be speed on...
-    { if (on) while (h!=0) { h--; pixon(x, y++); } else while (h!=0) { h--; pixoff(x, y++); } }
+
+    void vline(int8_t x, int8_t y, int8_t h, bool on=true) {
+        // Vertical line // could be speed on...
+        if (on) while (h!=0) { h--; pixon(x, y++); } else while (h!=0) { h--; pixoff(x, y++); }
+    }
+
+    void rect(int8_t x, int8_t y, uint8_t w, int8_t h, bool on=true) {
+        while (--h>=0) hline(x, w, y++, on);
+    }
 
     uint8_t text(char const *s, int8_t x, int8_t y, uint8_t eraseLastCol= 1, int8_t nb=127) // display in 8*6 pixel font. if eraseLastCol=0 then the last character only displays 5 columns
     {
@@ -127,6 +143,7 @@ public:
         }
         return x;
     }
+
     uint8_t text2(char const *s, int8_t x, int8_t y, uint8_t eraseLastCol= 1, int8_t nb=127)  // display in 16*10 pixel font. if eraseLastCol=0 then the last character only displays 10 columns
     {
         while (*s!=0 && --nb>=0)
@@ -137,6 +154,7 @@ public:
         }
         return x;
     }
+
     // b is in PROGMEM and is width, height and then the bitmap bits, vertically, with the next column starting as soon as the previous is done (no empty space)
     void blit(uint8_t const *b, uint8_t x, uint8_t y)
     {

@@ -54,31 +54,32 @@ void app_main(void) {
     CDisplay display;
     display.begin();
 
-    char ip[20]; sprintf(ip, ".%u", static_cast<uint8_t>((wifi_mgmt.get_ip() >> 24) & 0xFF));
-    display.clear();
-    display.text(ip, 0, 12);
-    display.disp();
 
     int i = 0;
+    uint8_t v= 0;
     while (1) {
-        display.clear();
-        // for (int y=0; y<40; y+= 8)
-        //   for (int x=(y&8); x<60; x+= 16)
-        //     display.rect(x, y, 8, 8);
-        // display.rect(60, 5, 10, 10);
-        // display.rect(61, 6, 8, 8, false);
-        // display.rect(62, 7, 6, 6);
+        display.clear(v);
+        // for (int y=0; y<40; y+= 8) {
+        //     for (int x=( y & 8); x<60; x+= 16) {
+        //         display.rect(x, y, 8, 8);
+        //     }
+        // }
+        // char t[20]; sprintf(t, "test %d", i); display.text(t, 0, 12);
 
-        char t[20]; sprintf(t, "test %d", i); display.text(t, 0, 32);
+        display.rect(0, 0, 72, 1);
+        display.rect(0, 39, 72, 1);
+        display.rect(0, 0, 1, 40);
+        display.rect(71, 0, 1, 40);
+
+        char ip[20]; sprintf(ip, ".%u", static_cast<uint8_t>((wifi_mgmt.get_ip() >> 24) & 0xFF));
+        display.text(ip, 3, 12);
+
+        char t[20]; sprintf(t, "test %d", i);
+        display.text(t, 3, 24);
+
         display.disp();
         ++i;
 
-        Status current_status{};
-        current_status.timenow = esp_timer_get_time();
-        if (xQueueOverwrite(status_queue, &current_status) != pdPASS) {
-            ESP_LOGE(TAG, "Status Queue write failed");
-        }
-
-        vTaskDelay(5000 / portTICK_PERIOD_MS);
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 }
