@@ -69,11 +69,11 @@ public:
         static uint8_t const initSeq[]= // 1 byte length of data, followed by data to be sent???
         { 2, 0x00, 0xAE,
           3, 0x00, 0xD5, 0x80,
-          3, 0x00, 0xA8, 0x27,
-          3, 0x00, 0xD3, 0x0C,
+          3, 0x00, 0xA8, 0x3F,
+          3, 0x00, 0xD3, 0x00,
           2, 0x00, 0x40,
           3, 0x00, 0x8D, 0x14,
-          3, 0x00, 0x20, 0x02,
+          3, 0x00, 0x20, 0x00,
           2, 0x00, 0xA1,
           2, 0x00, 0xC8,
           3, 0x00, 0xDA, 0x12,
@@ -92,7 +92,7 @@ public:
 
     void disp() // send the whole screen to the driver and wait until sent to continue...
     {
-        uint8_t c[4]= { 0x00, 0x11, 0x0c, 0xB0}; // start writing at column 28, row 0
+        uint8_t c[4]= { 0x00, 0x11, 0x0e, 0xB0}; // start writing at column 30. row 0 (but we have a WH scroll of 12)
         for (int i=0; i<5; i++)
         {
           c[3]= 0xB0+i; send(c, 4);
